@@ -1,8 +1,9 @@
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QWidget, QPushButton, 
-                             QTextEdit, QLabel, QComboBox, QHBoxLayout, QFileDialog, QMessageBox, QStackedWidget)
+                             QTextEdit, QLabel, QComboBox, QHBoxLayout, QFileDialog, QMessageBox)
 from config.constants import APP_NAME
 from core.session_manager import SessionManager
 from utils.logger import get_logger
+from ui.overlay_window import OverlayWindow
 
 logger = get_logger(__name__)
 
@@ -17,21 +18,12 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         self.setMinimumSize(800, 700)
         
-        self.stack = QStackedWidget()
-        
         # Setup Screen
         self.setup_screen = QWidget()
         self.init_setup_screen()
         
-        # Interview Screen
-        self.interview_screen = QWidget()
-        self.init_interview_screen()
-        
-        self.stack.addWidget(self.setup_screen)
-        self.stack.addWidget(self.interview_screen)
-        
-        self.setCentralWidget(self.stack)
-        self.stack.setCurrentWidget(self.setup_screen)
+        self.setCentralWidget(self.setup_screen)
+        self.overlay = None
 
     def init_setup_screen(self):
         layout = QVBoxLayout()
@@ -75,23 +67,7 @@ class MainWindow(QMainWindow):
         
         self.setup_screen.setLayout(layout)
 
-    def init_interview_screen(self):
-        layout = QVBoxLayout()
-        
-        self.status_label = QLabel("Status: Ready")
-        
-        self.transcript_area = QTextEdit()
-        self.transcript_area.setPlaceholderText("Live transcript will appear here...")
-        self.transcript_area.setReadOnly(True)
-        
-        self.stop_btn = QPushButton("Stop Recording")
-        self.stop_btn.clicked.connect(self.on_stop_session)
-        
-        layout.addWidget(self.status_label)
-        layout.addWidget(self.transcript_area)
-        layout.addWidget(self.stop_btn)
-        
-        self.interview_screen.setLayout(layout)
+
 
     def on_model_change(self, selected_model: str):
         self.session_manager.state.selected_model = selected_model
@@ -121,11 +97,16 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "Failed to parse resume. Check logs.")
             return
             
-        self.status_label.setText("Status: Listening...")
-        self.transcript_area.clear()
-        self.stack.setCurrentWidget(self.interview_screen)
+        self.hide()
+        
+        if not self.overlay:
+            self.overlay = OverlayWindow(stop_callback=self.on_stop_session)
+        
+        self.overlay.show()
 
     def on_stop_session(self):
         self.session_manager.stop_session()
-        self.status_label.setText("Status: Ready")
-        self.stack.setCurrentWidget(self.setup_screen)
+        if self.overlay:
+            self.overlay.close()
+            self.overlay = None
+        self.show()
