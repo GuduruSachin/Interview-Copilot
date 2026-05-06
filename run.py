@@ -40,13 +40,10 @@ def check_and_install_packages():
 
 check_and_install_packages()
 
-# Dynamically locate the interview_copilot folder
+# Add the current root directory to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-app_dir = os.path.join(current_dir, "interview_copilot")
-
-# Add it to sys.path to allow absolute imports from within the app
-if app_dir not in sys.path:
-    sys.path.insert(0, app_dir)
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 from main import main
 
