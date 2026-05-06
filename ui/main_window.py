@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QWidget, QPushButton, 
-                             QTextEdit, QLabel, QComboBox, QHBoxLayout, QFileDialog, QMessageBox)
+                             QTextEdit, QLabel, QComboBox, QHBoxLayout, QFileDialog, QMessageBox, QStackedWidget)
 from config.constants import APP_NAME
 from core.session_manager import SessionManager
 from utils.logger import get_logger
@@ -12,12 +12,28 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.session_manager = SessionManager()
         self.resume_path = ""
-        self.jd_text = ""
         self.setup_ui()
 
     def setup_ui(self):
         self.setMinimumSize(800, 700)
-        central_widget = QWidget()
+        
+        self.stack = QStackedWidget()
+        
+        # Setup Screen
+        self.setup_screen = QWidget()
+        self.init_setup_screen()
+        
+        # Interview Screen
+        self.interview_screen = QWidget()
+        self.init_interview_screen()
+        
+        self.stack.addWidget(self.setup_screen)
+        self.stack.addWidget(self.interview_screen)
+        
+        self.setCentralWidget(self.stack)
+        self.stack.setCurrentWidget(self.setup_screen)
+
+    def init_setup_screen(self):
         layout = QVBoxLayout()
         
         # Model Selection
@@ -47,28 +63,35 @@ class MainWindow(QMainWindow):
         self.jd_label = QLabel("Job Description:")
         self.jd_area = QTextEdit()
         self.jd_area.setPlaceholderText("Paste Job Description here...")
-        self.jd_area.setMaximumHeight(150)
-        
-        self.status_label = QLabel("Status: Ready")
-        self.transcript_area = QTextEdit()
-        self.transcript_area.setPlaceholderText("Live transcript will appear here...")
-        self.transcript_area.setReadOnly(True)
         
         self.start_btn = QPushButton("Start Session")
         self.start_btn.clicked.connect(self.on_start_session)
-        self.stop_btn = QPushButton("Stop Recording")
         
         layout.addLayout(model_layout)
         layout.addLayout(resume_layout)
         layout.addWidget(self.jd_label)
         layout.addWidget(self.jd_area)
+        layout.addWidget(self.start_btn)
+        
+        self.setup_screen.setLayout(layout)
+
+    def init_interview_screen(self):
+        layout = QVBoxLayout()
+        
+        self.status_label = QLabel("Status: Ready")
+        
+        self.transcript_area = QTextEdit()
+        self.transcript_area.setPlaceholderText("Live transcript will appear here...")
+        self.transcript_area.setReadOnly(True)
+        
+        self.stop_btn = QPushButton("Stop Recording")
+        self.stop_btn.clicked.connect(self.on_stop_session)
+        
         layout.addWidget(self.status_label)
         layout.addWidget(self.transcript_area)
-        layout.addWidget(self.start_btn)
         layout.addWidget(self.stop_btn)
         
-        central_widget.setLayout(layout)
-        self.setCentralWidget(central_widget)
+        self.interview_screen.setLayout(layout)
 
     def on_model_change(self, selected_model: str):
         self.session_manager.state.selected_model = selected_model
@@ -83,37 +106,26 @@ class MainWindow(QMainWindow):
             logger.info(f"Resume selected: {file_path}")
 
     def on_start_session(self):
-        self.jd_text = self.jd_area.toPlainText().strip()
+        jd_text = self.jd_area.toPlainText().strip()
         
         if not self.resume_path:
             QMessageBox.warning(self, "Error", "Please upload a resume first.")
             return
             
-        if not self.jd_text:
+        if not jd_text:
             QMessageBox.warning(self, "Error", "Please enter a Job Description.")
             return
             
-        self.status_label.setText("Status: Starting session...")
-        self.transcript_area.append("-- Starting Session --")
-        
-        success = self.session_manager.start_session(self.resume_path, self.jd_text)
+        success = self.session_manager.start_session(self.resume_path, jd_text)
         if not success:
-            self.status_label.setText("Status: Failed to start session")
             QMessageBox.warning(self, "Error", "Failed to parse resume. Check logs.")
             return
             
-        self.status_label.setText("Status: Session active.")
-        
-        # Test question for mock flow using real data
-        question = "Can you tell me how your experience in your resume align with this JD?"
-        self.transcript_area.append(f"Question: {question}")
-        
-        response = self.session_manager.run_mock_interview(
-            self.session_manager.state.resume_text, 
-            self.session_manager.state.jd_text, 
-            question
-        )
-        
-        self.transcript_area.append(f"AI Response:\n{response}")
-        self.transcript_area.append("----------------------------")
+        self.status_label.setText("Status: Listening...")
+        self.transcript_area.clear()
+        self.stack.setCurrentWidget(self.interview_screen)
+
+    def on_stop_session(self):
+        self.session_manager.stop_session()
         self.status_label.setText("Status: Ready")
+        self.stack.setCurrentWidget(self.setup_screen)

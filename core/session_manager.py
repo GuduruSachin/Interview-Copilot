@@ -40,7 +40,7 @@ class SessionManager:
         logger.info("Interview session has started.")
         return True
 
-    def end_session(self):
+    def stop_session(self):
         self.state.is_running = False
         logger.info("Interview session has ended.")
 
